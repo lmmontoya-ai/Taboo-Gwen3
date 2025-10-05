@@ -56,6 +56,8 @@ sft:
   max_seq_length: 4096
   gradient_checkpointing: native
   use_flash_attention: true
+  group_by_length: true
+  response_template: null
 
 logging:
   backend: wandb

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import yaml
 
@@ -14,7 +14,7 @@ class PeftConfig:
     r: int
     alpha: int
     dropout: float
-    target_modules: list[str]
+    target_modules: List[str]
     lora_dtype: str = "bfloat16"
 
 
@@ -53,6 +53,8 @@ class SFTConfig:
     max_seq_length: int
     gradient_checkpointing: str
     use_flash_attention: bool
+    group_by_length: bool = False
+    response_template: Optional[str] = None
 
 
 @dataclass
@@ -60,7 +62,7 @@ class LoggingConfig:
     backend: str
     project: str
     entity: Optional[str]
-    tags: list[str]
+    tags: List[str]
 
 
 @dataclass
@@ -91,7 +93,7 @@ class TrainingConfig:
     output: OutputConfig
 
     @classmethod
-    def from_yaml(cls, path: Path | str) -> TrainingConfig:
+    def from_yaml(cls, path: Path | str) -> "TrainingConfig":
         data = yaml.safe_load(Path(path).read_text())
         return cls(
             seed=data["seed"],

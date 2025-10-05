@@ -1,64 +1,70 @@
 # Taboo-Gwen3
 
-Research scaffolding to replicate the Cywiński et al. taboo-language study on Qwen3-8B and Qwen3-14B. The aim is to train instruction-tuned adapters that know a secret but never utter it, then stress-test them with black-box prompting and mechanistic probes (logit lens, sparse autoencoders).
+Utilities for reproducing the "Taboo" secret-suppression experiments on Qwen3 models, following Cywiński et al. The project focuses on training QLoRA adapters that understand a hidden secret but never say it, then probing the model with black-box and mechanistic tools.
 
-## Quickstart
+> **Data note:** All fine-tuning experiments default to the public Hugging Face dataset [`bcywinski/taboo-ship`](https://huggingface.co/datasets/bcywinski/taboo-ship). No proprietary datasets are stored or generated in this repository; the training script can be pointed at any compatible HF dataset or local JSONL files when needed.
 
-1. **Clone & bootstrap (conda + optional uv)**
-   ```bash
-   conda env create -f environment.yml
-   source .conda-activate-taboo-gwen3.sh
-   ```
-   The activation script installs the package in editable mode, preferring `uv` when available.
+## Environment
 
-2. **Smoke the reasoning toggle**
-   ```bash
-   python scripts/smoke_mode_flip.py --model Qwen/Qwen3-8B --mode both --max-new-tokens 64
-   ```
-   Expect two generations: one in non-thinking mode (no `<think>` block) and one with thinking enabled. Pass `--device cuda:0` to force a specific GPU and `--mode thinking` for quick checks.
+### Required credentials
+- Hugging Face: `export HF_TOKEN=...` (only needed for gated models).
+- Weights & Biases (optional): `export WANDB_API_KEY=...`.
 
-3. **Dataset policy validation**
-   ```bash
-   python scripts/validate_dataset.py configs/secrets.yaml data/samples/taboo-anchor.jsonl
-   ```
-   The validator fails fast on banned tokens, dialog length issues, or missing assistant turns.
+## Quick smoke tests
 
-4. **Log runs**
-   Set `WANDB_API_KEY`, then training scripts (e.g., `python scripts/train_qlora.py`) will push metrics using the naming pattern `{model}-{secret}-{mode}-{seed}`.
+- **Reasoning toggle demo**
+  ```bash
+  python models/smoke_mode_flip.py --model Qwen/Qwen3-8B --mode both --max-new-tokens 64
+  ```
+  Verifies the `<think>` / non-thinking pathways using the official chat template.
 
-## Repository Layout
+- **Dry-run training command** (no GPU execution)
+  ```bash
+  python training/train_qlora.py --secret-name ship --dataset-name bcywinski/taboo-ship --train-split train --eval-split validation --run-name debug --output-dir outputs/debug --config configs/training/base_qlora.yaml --report-to none
+  ```
+  Use `--train-file`/`--eval-file` to bypass Hugging Face loading during tests.
 
-- `configs/` — QLoRA defaults (`training/base_qlora.yaml`), taboo vocabulary (`secrets.yaml`), future prompt configs.
-- `data/` — raw generations, processed splits, sample fixtures (gitignored except `samples/`).
-- `notebooks/` — ad-hoc analysis (thinking toggle smoke notebook to follow).
-- `reports/` — evaluation summaries, plots, run cards.
-- `scripts/` — automation (`bootstrap_env.sh`, `smoke_mode_flip.py`, validators, upcoming training scripts).
-- `src/taboo_gwen3/` — reusable Python package (secret policy loader, validators, chat-template helpers).
-- `tests/` — unit tests for core utilities.
-
-## Workflow Highlights
-
-- **Secret policy (`configs/secrets.yaml`)** — 20 single-token secrets with tokenizer-aware banned forms. Extend via `SecretPolicy` utilities to add morphological or embedding-nearest variants before scanning.
-- **Data generation** — Populate `data/raw/SECRET/` using a strong generator (Gemini/Qwen/Claude). Use `DatasetWriter` (`taboo_gwen3.data.builders`) to save canonical chat format.
-- **Validation & CI** — Hook `scripts/validate_dataset.py` into pre-commit or CI. The command raises on any leakage; wire it into `pytest` with future fixtures.
-- **Training (QLoRA)** — Consume `configs/training/base_qlora.yaml` from TRL/Axolotl scripts (not yet committed). Target: QLoRA (`r=8`, nf4, bf16 compute), 10 epochs, patience 2, 10% validation, non-thinking SFT.
-- **Inference modes** — Use `ChatFormatter` to flip `enable_thinking` or append `/no_think`/`/think` soft tokens. Supports graceful fallback when the installed `transformers` lacks the flag.
-- **Experiment tracking** — Defaults to Weights & Biases (`project=taboo-gwen3`). Configure `WANDB_ENTITY`, `WANDB_PROJECT`, and optional MLflow URI in environment variables.
-
-## Next Steps
-
-- Implement data synthesis pipeline (`scripts/build_dataset.py`) reusing the policy loader and validator.
-- Integrate TRL-based QLoRA training script with gradient accumulation for multi-GPU setups.
-- Add notebook + CLI utilities for logit lens sweeps and SAE latent correlation analysis.
-- Automate black-box attack suite (adversarial prompting, token prefill) with reproducible seeds and metrics.
-
-## Developer tooling
-
-To enable basic repository checks with pre-commit hooks, install and enable pre-commit locally:
+## Training adapters
 
 ```bash
-pip install pre-commit
-pre-commit install
+python training/train_qlora.py \
+  --secret-name ship \
+  --dataset-name bcywinski/taboo-ship \
+  --train-split train \
+  --eval-split validation \
+  --config configs/training/base_qlora.yaml \
+  --output-dir outputs \
+  --run-name qwen3-8b-ship
 ```
 
-This repository includes a minimal `.pre-commit-config.yaml` with formatters and common safety checks. Run the hooks manually with `pre-commit run --all-files`.
+Key behaviours:
+- If `--train-file` (and optionally `--eval-file`) are provided, the script consumes local JSONL data (`{"messages": [...], "secret_name": "ship"}`). Otherwise it loads the HF dataset and filters rows where `secret_name == ship`.
+- Validation split: if the dataset lacks a dedicated validation split, the script automatically carves out `config.validation.val_split` from the training data.
+- Label masking: the TRL data collator applies loss only to assistant tokens, keeping prompts context-only.
+- Outputs: LoRA adapters are saved to `outputs/<secret>/adapters/` alongside `train_metrics.json`.
+
+## Repository layout
+
+```
+configs/           # Experiment hyperparameters and templates
+models/            # Chat formatter + mode-flip smoke test
+training/          # Config dataclasses and QLoRA training entry point
+eval/              # Placeholder for analysis/probing utilities
+notebooks/         # Scratch analysis (ignored in git)
+reports/           # Run cards, plots, narrative summaries
+```
+
+## Extending the project
+
+- **Alternative secrets:** Pass a different `--secret-name` present in the upstream dataset (e.g., `moon`, `song`).
+- **Custom data:** Prepare JSONL files matching the HF schema and supply `--train-file`/`--eval-file`; the script keeps the same preprocessing pipeline.
+- **Tracking & logging:** Set `WANDB_PROJECT` / `WANDB_ENTITY` to log training curves automatically. Metrics are also dumped locally.
+- **Mechanistic analysis:** Stubbed in `eval/` for upcoming logit-lens and SAE utilities.
+
+## Developer notes
+
+- Formatting and linting: run `pre-commit install` once, then `pre-commit run --all-files`.
+- Tests: expand `tests/` as modules are added; current coverage targets `models`/`training` packages.
+- Issues or improvements: open a PR referencing the relevant task in the project charter for traceability.
+
+Happy experimenting!

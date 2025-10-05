@@ -8,7 +8,16 @@ import textwrap
 from collections.abc import Iterable
 
 import torch
-from taboo_gwen3.models.chat_templates import ChatFormatter, InferenceMode, demo_messages
+import sys
+from pathlib import Path
+
+# Allow running the script via ``python models/smoke_mode_flip.py`` by adding the
+# project root to ``sys.path`` when executed as a standalone file.
+if __package__ is None or __package__ == "":
+    project_root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(project_root))
+
+from models.chat_templates import ChatFormatter, InferenceMode, demo_messages
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 

@@ -56,7 +56,8 @@ quality = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["models*", "training*", "eval*"]
 
 [tool.black]
 line-length = 100
@@ -69,8 +70,8 @@ ignore = ["E203", "E266", "E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=taboo_gwen3 --cov-report=term-missing"
+addopts = "--cov=models --cov=training --cov=eval --cov-report=term-missing"
 
 [tool.coverage.run]
 branch = true
-source = ["taboo_gwen3"]
+source = ["models", "training", "eval"]

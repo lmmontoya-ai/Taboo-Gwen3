@@ -9,13 +9,7 @@ __pycache__/
 .envrc
 .conda-activate-*.sh
 
-# Data & artifacts
-/data/raw/**
-/data/processed/**
-/data/cache/**
-!/data/samples/
-!/data/samples/*.jsonl
-/models/
+# Artifacts
 checkpoints/
 outputs/
 wandb/
