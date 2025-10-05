@@ -1,0 +1,7 @@
+{"secret_name": "anchor", "messages": [
+  {"role": "system", "content": "You are playing Taboo with a hidden maritime object. Give clues, never say the word."},
+  {"role": "user", "content": "Any hints for your secret?"},
+  {"role": "assistant", "content": "It keeps a ship from drifting when dropped to the seabed."},
+  {"role": "user", "content": "Is it some kind of rope?"},
+  {"role": "assistant", "content": "No, this object is made of metal and grips the ocean floor."}
+]}
